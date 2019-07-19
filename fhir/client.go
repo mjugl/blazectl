@@ -41,6 +41,31 @@ func (c *Client) NewCapabilitiesRequest() (*http.Request, error) {
 	return req, nil
 }
 
+// NewSystemHistoryRequest creates a new system history interaction request.
+// Uses the base URL from the FHIR client and sets JSON Accept header.
+// Otherwise it's identical to http.NewRequest.
+func (c *Client) NewSystemHistoryRequest() (*http.Request, error) {
+	req, err := http.NewRequest("GET", c.Base+"/_history", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Accept", "application/fhir+json")
+	return req, nil
+}
+
+// NewCreateRequest creates a new create interaction request.
+// Uses the base URL from the FHIR client and sets JSON Accept and Content-Type
+// headers. Otherwise it's identical to http.NewRequest.
+func (c *Client) NewCreateRequest(resourceType string, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequest("POST", c.Base+"/"+resourceType, body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Accept", "application/fhir+json")
+	req.Header.Add("Content-Type", "application/fhir+json")
+	return req, nil
+}
+
 // NewTransactionRequest creates a new transaction/batch interaction request.
 // Uses the base URL from the FHIR client and sets JSON Accept and Content-Type
 // headers. Otherwise it's identical to http.NewRequest.
@@ -109,6 +134,24 @@ func ReadCapabilityStatement(r io.Reader) (CapabilityStatement, error) {
 	return capabilityStatement, nil
 }
 
+// ReadGeneric reads and unmarshals a resource in a generic way.
+func ReadGeneric(r io.Reader) (map[string]interface{}, error) {
+	body, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	return UnmarshalGeneric(body)
+}
+
+// UnmarshalBundle unmarshals a bundle.
+func UnmarshalGeneric(b []byte) (map[string]interface{}, error) {
+	var resource map[string]interface{}
+	if err := json.Unmarshal(b, &resource); err != nil {
+		return nil, err
+	}
+	return resource, nil
+}
+
 // ReadBundle reads and unmarshals a bundle.
 func ReadBundle(r io.Reader) (Bundle, error) {
 	var bundle Bundle
@@ -126,4 +169,22 @@ func UnmarshalBundle(b []byte) (Bundle, error) {
 		return bundle, err
 	}
 	return bundle, nil
+}
+
+// ReadTestScript reads and unmarshals a test script.
+func ReadTestScript(r io.Reader) (TestScript, error) {
+	body, err := ioutil.ReadAll(r)
+	if err != nil {
+		return TestScript{}, err
+	}
+	return UnmarshalTestScript(body)
+}
+
+// UnmarshalTestScript unmarshals a test script.
+func UnmarshalTestScript(b []byte) (TestScript, error) {
+	var testScript TestScript
+	if err := json.Unmarshal(b, &testScript); err != nil {
+		return testScript, err
+	}
+	return testScript, nil
 }

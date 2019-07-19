@@ -197,13 +197,7 @@ Example:
 		if len(args) < 1 {
 			return errors.New("requires a directory argument")
 		}
-		if info, err := os.Stat(args[0]); os.IsNotExist(err) {
-			return fmt.Errorf("directory `%s` doesn't exist", args[0])
-		} else if !info.IsDir() {
-			return fmt.Errorf("`%s` isn't a directory", args[0])
-		} else {
-			return nil
-		}
+		return checkDir(args[0])
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		dir := args[0]
