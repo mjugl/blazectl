@@ -214,8 +214,6 @@ Example:
 			os.Exit(1)
 		}
 
-		fmt.Printf("Starting Upload to %s ...\n", server)
-
 		progress := mpb.New()
 		bar := progress.AddBar(int64(len(files)),
 			mpb.BarRemoveOnComplete(),
@@ -231,9 +229,16 @@ Example:
 		aggregatedUploadResultsCh := make(chan aggregatedUploadResults)
 		go aggregateUploadResults(len(files), uploadResultCh, aggregatedUploadResultsCh)
 
+		client, err := initClient()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Starting Upload to %s\n\n", client.Base)
+
 		// Loop through files and upload
 		sem := make(chan bool, concurrency)
-		client := &fhir.Client{Base: server}
 		start := time.Now()
 		for _, file := range files {
 			sem <- true

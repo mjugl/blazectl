@@ -136,9 +136,15 @@ var countResourcesCmd = &cobra.Command{
 on a server and issues an empty search for each resource type with 
 _summary=count to count all resources by type.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Count all resources on %s ...\n\n", server)
 
-		client := &fhir.Client{Base: server}
+		client, err := initClient()
+		if err != nil {
+			fmt.Println(err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Count all resources on %s\n\n", client.Base)
+
 		resourceTypes, err := fetchResourceTypesWithSearchTypeInteraction(client)
 		if err != nil {
 			fmt.Println(err)
