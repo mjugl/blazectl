@@ -20,12 +20,6 @@ import (
 	"compress/gzip"
 	"errors"
 	"fmt"
-	"github.com/samply/blazectl/fhir"
-	"github.com/samply/blazectl/util"
-	fm "github.com/samply/golang-fhir-models/fhir-models/fhir"
-	"github.com/spf13/cobra"
-	"github.com/vbauerster/mpb/v7"
-	"github.com/vbauerster/mpb/v7/decor"
 	"io"
 	"net/http"
 	"net/http/httptrace"
@@ -34,6 +28,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/samply/blazectl/fhir"
+	"github.com/samply/blazectl/util"
+	fm "github.com/samply/golang-fhir-models/fhir-models/fhir"
+	"github.com/spf13/cobra"
+	"github.com/vbauerster/mpb/v7"
+	"github.com/vbauerster/mpb/v7/decor"
 )
 
 const MultiBundleFileBundleDelimiter = byte('\n')
@@ -582,7 +583,7 @@ Example:
 		}
 
 		if len(aggResults.processingDurations) > 0 {
-			processingStats := util.CalculateDurationStatistics(aggResults.requestDurations)
+			processingStats := util.CalculateDurationStatistics(aggResults.processingDurations)
 			fmt.Printf("Proc. Latencies  [mean, 50, 95, 99, max]  %s, %s, %s, %s %s\n",
 				processingStats.Mean, processingStats.Q50, processingStats.Q95, processingStats.Q99, processingStats.Max)
 		}
