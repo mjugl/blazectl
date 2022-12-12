@@ -16,9 +16,11 @@ package util
 
 import (
 	"fmt"
-	"gonum.org/v1/gonum/floats"
+	"math"
 	"sort"
 	"time"
+
+	"gonum.org/v1/gonum/floats"
 )
 
 // DurationStatistics represents statistics about measured durations.
@@ -30,17 +32,25 @@ type DurationStatistics struct {
 
 // Calculates the DurationStatistics for a set of given durations.
 func CalculateDurationStatistics(durations []float64) DurationStatistics {
-	if len(durations) == 0 {
+	var filteredDurations []float64
+
+	for _, d := range durations {
+		if !math.IsNaN(d) && d >= 0 {
+			filteredDurations = append(filteredDurations, d)
+		}
+	}
+
+	if len(filteredDurations) == 0 {
 		return DurationStatistics{}
 	}
 
-	sort.Float64s(durations)
+	sort.Float64s(filteredDurations)
 	return DurationStatistics{
-		Mean: time.Duration(floats.Sum(durations)/float64(len(durations))*1000) * time.Millisecond,
-		Q50:  time.Duration(durations[len(durations)/2]*1000) * time.Millisecond,
-		Q95:  time.Duration(durations[int(float32(len(durations))*0.95)]*1000) * time.Millisecond,
-		Q99:  time.Duration(durations[int(float32(len(durations))*0.99)]*1000) * time.Millisecond,
-		Max:  time.Duration(durations[len(durations)-1]*1000) * time.Millisecond,
+		Mean: time.Duration(floats.Sum(filteredDurations)/float64(len(filteredDurations))*1000) * time.Millisecond,
+		Q50:  time.Duration(filteredDurations[len(filteredDurations)/2]*1000) * time.Millisecond,
+		Q95:  time.Duration(filteredDurations[int(float32(len(filteredDurations))*0.95)]*1000) * time.Millisecond,
+		Q99:  time.Duration(filteredDurations[int(float32(len(filteredDurations))*0.99)]*1000) * time.Millisecond,
+		Max:  time.Duration(filteredDurations[len(filteredDurations)-1]*1000) * time.Millisecond,
 	}
 }
 
@@ -64,8 +74,8 @@ func FmtBytesHumanReadable(bytes float32) string {
 
 // FmtDurationHumanReadable takes a duration and returns it in a human readable form.
 // This is basically equivalent to time.Duration.Round(time.Second) with the following differences:
-//	- durations under a minute get printed with millisecond precision
-//	- durations equal or above a minute get printed with second precision
+//   - durations under a minute get printed with millisecond precision
+//   - durations equal or above a minute get printed with second precision
 func FmtDurationHumanReadable(d time.Duration) string {
 	if d.Milliseconds() < 60000 {
 		return fmt.Sprintf("%s", d.Round(time.Millisecond))

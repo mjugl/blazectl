@@ -21,9 +21,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptrace"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -185,9 +187,11 @@ type bundleUploadResult struct {
 type aggregatedUploadResults struct {
 	totalProcessedBundles                 int
 	requestDurations, processingDurations []float64
-	totalBytesIn, totalBytesOut           int64
-	errorResponses                        map[bundleIdentifier]util.ErrorResponse
-	errors                                map[bundleIdentifier]error
+	// keep track of bundle identifiers for eval
+	identifiers                 []bundleIdentifier
+	totalBytesIn, totalBytesOut int64
+	errorResponses              map[bundleIdentifier]util.ErrorResponse
+	errors                      map[bundleIdentifier]error
 }
 
 func aggregateUploadResults(
@@ -196,6 +200,8 @@ func aggregateUploadResults(
 	progress progress) {
 
 	var totalProcessedBundles int
+	// keep track of bundle identifiers so we can identify which bundles might take longer than others
+	var identifiers []bundleIdentifier
 	var requestDurations []float64
 	var processingDurations []float64
 	var totalBytesIn int64
@@ -213,6 +219,8 @@ func aggregateUploadResults(
 			if uploadResult.uploadInfo.statusCode == http.StatusOK {
 				processingDurations = append(processingDurations, uploadResult.uploadInfo.processingDuration.Seconds())
 			} else {
+				// add NaN to processingDurations to keep the length the same as requestDurations
+				processingDurations = append(processingDurations, math.NaN())
 				operationOutcome, err := fm.UnmarshalOperationOutcome(uploadResult.uploadInfo.error)
 				if err != nil {
 					errorResponses[uploadResult.id] = util.ErrorResponse{
@@ -229,6 +237,8 @@ func aggregateUploadResults(
 			totalBytesIn += uploadResult.uploadInfo.bytesIn
 			totalBytesOut += uploadResult.uploadInfo.bytesOut
 			requestDurations = append(requestDurations, uploadResult.uploadInfo.requestDuration.Seconds())
+			// add bundle identifier for eval
+			identifiers = append(identifiers, uploadResult.id)
 		}
 	}
 
@@ -240,6 +250,7 @@ func aggregateUploadResults(
 		totalBytesOut:         totalBytesOut,
 		errorResponses:        errorResponses,
 		errors:                errs,
+		identifiers:           identifiers,
 	}
 }
 
@@ -491,6 +502,7 @@ func createProgress(numBundles int) progress {
 }
 
 var concurrency int
+var outputStatisticsFileName string
 
 // uploadCmd represents the upload command
 var uploadCmd = &cobra.Command{
@@ -618,6 +630,32 @@ Example:
 				fmt.Printf("File: %s [Bundle: %d] : %v\n", bundleId.filename, bundleId.bundleNumber, err.Error())
 			}
 		}
+
+		// write statistics output file
+		if outputStatisticsFileName != "" {
+			f, err := os.Create(outputStatisticsFileName)
+
+			if err != nil {
+				fmt.Printf("Failed to open output file: %v\n", err)
+				os.Exit(1)
+			}
+
+			defer f.Close()
+
+			l := len(aggResults.identifiers)
+
+			f.WriteString("filename,request,processing\n")
+
+			for i := 0; i < l; i++ {
+				f.WriteString(fmt.Sprintf("%v,%v,%v\n",
+					path.Base(aggResults.identifiers[i].filename),
+					aggResults.requestDurations[i],
+					aggResults.processingDurations[i]))
+			}
+
+			fmt.Println("Wrote output file")
+		}
+
 		if len(aggResults.errorResponses) > 0 || len(aggResults.errors) > 0 {
 			os.Exit(1)
 		}
@@ -630,6 +668,7 @@ func init() {
 
 	uploadCmd.Flags().StringVar(&server, "server", "", "the base URL of the server to use")
 	uploadCmd.Flags().IntVarP(&concurrency, "concurrency", "c", 2, "number of parallel uploads")
+	uploadCmd.Flags().StringVar(&outputStatisticsFileName, "output", "", "file to write detailed statistics to")
 
 	_ = uploadCmd.MarkFlagRequired("server")
 }

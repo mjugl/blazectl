@@ -15,11 +15,12 @@
 package util
 
 import (
-	"github.com/stretchr/testify/assert"
 	"math"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestCalculateDurationStatistics(t *testing.T) {
@@ -39,6 +40,15 @@ func TestCalculateDurationStatistics(t *testing.T) {
 		assert.Equal(t, 1.0*time.Second, statistics.Q50)
 		assert.Equal(t, 1.0*time.Second, statistics.Q95)
 		assert.Equal(t, 1.0*time.Second, statistics.Q99)
+	})
+
+	t.Run("NaN", func(t *testing.T) {
+		statistics := CalculateDurationStatistics([]float64{math.NaN()})
+		assert.Equal(t, time.Duration(0), statistics.Mean)
+		assert.Equal(t, time.Duration(0), statistics.Max)
+		assert.Equal(t, time.Duration(0), statistics.Q50)
+		assert.Equal(t, time.Duration(0), statistics.Q95)
+		assert.Equal(t, time.Duration(0), statistics.Q99)
 	})
 }
 
