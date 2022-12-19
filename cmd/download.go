@@ -20,11 +20,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/samply/blazectl/fhir"
-	"github.com/samply/blazectl/util"
-	fm "github.com/samply/golang-fhir-models/fhir-models/fhir"
-	"github.com/spf13/cobra"
 	"io"
+	"math"
 	"net/http"
 	"net/http/httptrace"
 	"net/url"
@@ -32,6 +29,11 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/samply/blazectl/fhir"
+	"github.com/samply/blazectl/util"
+	fm "github.com/samply/golang-fhir-models/fhir-models/fhir"
+	"github.com/spf13/cobra"
 )
 
 var outputFile string
@@ -46,6 +48,7 @@ type commandStats struct {
 	totalDuration                         time.Duration
 	inlineOperationOutcomes               []*fm.OperationOutcome
 	error                                 *util.ErrorResponse
+	bundles                               []downloadBundle
 }
 
 func (cs *commandStats) String() string {
@@ -312,12 +315,18 @@ Example:
 
 		for bundle := range bundleChannel {
 			stats.totalPages++
+			stats.bundles = append(stats.bundles, bundle)
 
 			if bundle.err != nil || bundle.errResponse != nil {
 				fmt.Printf("Failed to download resources: %v\n", bundle.err)
 
 				stats.error = bundle.errResponse
 				stats.totalDuration = time.Since(startTime)
+
+				stats.requestDurations = append(stats.requestDurations, math.NaN())
+				stats.processingDurations = append(stats.processingDurations, math.NaN())
+				stats.resourcesPerPage = append(stats.resourcesPerPage, -1)
+
 				fmt.Println(stats.String())
 				os.Exit(1)
 			} else {
@@ -338,6 +347,32 @@ Example:
 
 		stats.totalDuration = time.Since(startTime)
 		fmt.Println(stats.String())
+
+		if outputStatisticsFileName != "" {
+			f, err := os.Create(outputStatisticsFileName)
+
+			if err != nil {
+				fmt.Printf("Failed to open output file: %v\n", err)
+				os.Exit(1)
+			}
+
+			defer f.Close()
+
+			l := len(stats.bundles)
+
+			f.WriteString("associatedRequestUrl,request,processing,resourcesPerPage\n")
+
+			for i := 0; i < l; i++ {
+				f.WriteString(fmt.Sprintf("%v,%v,%v,%v\n",
+					stats.bundles[i].associatedRequestURL.String(),
+					stats.requestDurations[i],
+					stats.processingDurations[i],
+					stats.resourcesPerPage[i]))
+			}
+
+			fmt.Println("Wrote output file")
+		}
+
 		return nil
 	},
 }
@@ -561,6 +596,7 @@ func init() {
 	downloadCmd.Flags().StringVarP(&outputFile, "output-file", "o", "", "path to the NDJSON file downloaded resources get written to")
 	downloadCmd.Flags().StringVarP(&fhirSearchQuery, "query", "q", "", "FHIR search query")
 	downloadCmd.Flags().BoolVarP(&usePost, "use-post", "p", false, "use POST to execute the search")
+	downloadCmd.Flags().StringVar(&outputStatisticsFileName, "output", "", "file to write detailed statistics to")
 
 	_ = downloadCmd.MarkFlagRequired("server")
 	_ = downloadCmd.MarkFlagRequired("output-file")
